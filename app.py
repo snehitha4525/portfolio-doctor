@@ -718,6 +718,64 @@ def main():
             for ticker in current_weights.index:
                 fundamentals = analyzer.analyze_fundamentals(ticker)
                 beta = fundamentals.get('beta') if fundamentals else None
-                 if __name__ == "__main__":
-    main()
+                if isinstance(beta, (int, float)):
+                    betas[ticker] = float(beta)
+                else:
+                    betas[ticker] = 1.0
 
+            beta_series = pd.Series(betas)
+
+            scenarios = {
+                "COVID-19 Crash 2020 (~-34% Market)": -0.34,
+                "Global Financial Crisis 2008 (~-52% Market)": -0.52,
+                "Generic -30% Shock": -0.30
+            }
+
+            scenario_results = {}
+            for name, shock in scenarios.items():
+                portfolio_change = float((current_weights * beta_series * shock).sum())
+                scenario_results[name] = portfolio_change
+
+            scenario_names = list(scenario_results.keys())
+            scenario_losses_pct = [scenario_results[name] * 100 for name in scenario_names]
+
+            fig_stress = go.Figure()
+            fig_stress.add_trace(go.Bar(
+                x=scenario_names,
+                y=scenario_losses_pct,
+                marker_color=['red' if v < 0 else 'green' for v in scenario_losses_pct]
+            ))
+            fig_stress.update_layout(
+                title="Estimated Portfolio Return Under Crash Scenarios",
+                yaxis_title="Estimated Portfolio Return (%)"
+            )
+            st.plotly_chart(fig_stress, use_container_width=True)
+
+            st.write("### Scenario Summary")
+            for name, change in scenario_results.items():
+                st.write(f"- **{name}**: estimated portfolio change ≈ {change*100:.1f}%")
+
+            st.write("### Beta Profile of Holdings")
+            beta_df = pd.DataFrame({
+                "Beta": beta_series,
+                "Weight %": (current_weights * 100).round(2)
+            }).round(2).sort_values("Beta", ascending=False)
+            st.dataframe(beta_df)
+
+            high_beta = beta_df[beta_df["Beta"] > 1.2]
+            low_beta = beta_df[beta_df["Beta"] < 0.8]
+
+            if not high_beta.empty:
+                st.warning("High-beta (more crash-sensitive) stocks:")
+                for idx, row in high_beta.iterrows():
+                    st.write(f"- {idx}: beta {row['Beta']:.2f}, weight {row['Weight %']:.2f}%")
+
+            if not low_beta.empty:
+                st.success("Lower-beta (more defensive) stocks:")
+                for idx, row in low_beta.iterrows():
+                    st.write(f"- {idx}: beta {row['Beta']:.2f}, weight {row['Weight %']:.2f}%")
+
+            st.caption("This stress test uses beta × market shock as an approximation. It is a simple sensitivity model, not a full risk engine.")
+
+if __name__ == "__main__":
+    main()
