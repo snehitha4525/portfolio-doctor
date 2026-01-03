@@ -718,4 +718,6 @@ def main():
             for ticker in current_weights.index:
                 fundamentals = analyzer.analyze_fundamentals(ticker)
                 beta = fundamentals.get('beta') if fundamentals else None
-                if
+                
+        if __name__ == "__main__":
+    main()
